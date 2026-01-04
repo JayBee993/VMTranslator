@@ -1,0 +1,22 @@
+JAVAC = javac
+JAVA  = java
+
+JAVA_VERSION = 17
+
+MAIN_CLASS = VMTranslator
+SOURCES = $(wildcard *.java)
+
+TARGET = VMTranslator
+
+all: compile script
+
+compile:
+	$(JAVAC) --release $(JAVA_VERSION) $(SOURCES)
+
+script:
+	echo '#!/bin/sh' > $(TARGET)
+	echo '$(JAVA) $(MAIN_CLASS) "$$@"' >> $(TARGET)
+	chmod 750 $(TARGET)
+
+clean:
+	rm -f *.class $(TARGET)
