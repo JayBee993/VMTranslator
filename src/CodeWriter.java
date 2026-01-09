@@ -8,6 +8,8 @@ public class CodeWriter {
     private final BufferedWriter writer;
     // keeps track of the number of the comparisons that have taken place
     int comparisonCounter = 0;
+    
+    boolean previousCommandledtoBoolean = false;
 
     public CodeWriter(Path outputFile) throws IOException {
         this.writer = Files.newBufferedWriter(outputFile);
@@ -15,6 +17,8 @@ public class CodeWriter {
     
     
     public void write(VMCommand currentCommand) throws IOException {
+    	
+//    	System.out.println(currentCommand.commandType().toString());
 
     	switch (currentCommand.commandType()) {
 
@@ -98,6 +102,15 @@ public class CodeWriter {
                     throw new IllegalArgumentException("Unexpected value: " + currentCommand);
             }
             break;
+        case C_LABEL:
+        	writeLabel(currentCommand);
+        	break;
+        case C_GOTO:
+        	writeGoto(currentCommand);
+        	break;
+        case C_IF:
+        	writeIfGoto(currentCommand);
+        	break;
 
         default:
             throw new IllegalArgumentException("Unexpected value: " + currentCommand);
@@ -112,6 +125,40 @@ public class CodeWriter {
     private void writeLine(String line) throws IOException {
         writer.write(line);
         writer.newLine(); // platform-independent line break
+    }
+    
+    private void writeLabel(VMCommand currentCommand) throws IOException {
+    	writeLine("(" + currentCommand.label() + ")");
+	}
+    
+    private void writeGoto(VMCommand currentCommand) throws IOException {
+    	writeLine("@" + currentCommand.label());
+    	writeLine("0;JMP");
+	}
+    
+    private void writeIfGoto(VMCommand currentCommand) throws IOException {
+    	if(previousCommandledtoBoolean) {
+        	// case of a boolean value
+        	writeLine("@SP");
+        	writeLine("M=M-1");
+        	writeLine("A=M");
+        	writeLine("D=M+1"); // true = -1, if a evaluation is positiv the value -1 is written on top of the stack
+        	
+        	writeLine("@" + currentCommand.label());
+        	writeLine("D;JEQ");
+    	} else {
+        	// case if we don't have an boolean value on the stack, in this case it is checked if the stackvalue is >0
+        	writeLine("@SP");
+        	writeLine("M=M-1");
+        	writeLine("A=M");
+        	writeLine("D=M");
+        	
+        	writeLine("@" + currentCommand.label());
+        	writeLine("D;JGT");
+    	}
+    	
+    	// set the booloean back
+    	previousCommandledtoBoolean = false;
     }
     
 
@@ -409,6 +456,8 @@ public class CodeWriter {
 		
 		writeLine("(CONTINUE." + String.valueOf(comparisonCounter)+ ")");
 		incrementStackPointer();
+		
+		previousCommandledtoBoolean = true;
     	
     }
     
