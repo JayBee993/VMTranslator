@@ -38,7 +38,8 @@ public class VMTranslator {
 	public static void main(String[] args) throws IOException {		
 	//	List<String> files = List.of("BasicTest","PointerTest","SimpleAdd","StackTest","StaticTest");
 		
-		List<String> files = List.of("BasicLoop","FibonacciSeries");
+//		List<String> files = List.of("BasicLoop","FibonacciSeries");
+		List<String> files = List.of("FibonacciElement");
 		
 		for(String file : files) {
 			

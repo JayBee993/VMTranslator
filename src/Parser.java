@@ -79,37 +79,59 @@ public class Parser {
 				throw new IllegalArgumentException("Invalid push instruction: " + instruction);
 			}
 			return new VMCommand(CommandType.C_PUSH, MemorySegment.fromString(parts[1]), Integer.parseInt(parts[2]),
-					null, null);
+					null, null, null, null, null);
 		
 		case "pop":
 			if (parts.length != 3) {
 				throw new IllegalArgumentException("Invalid pop instruction: " + instruction);
 			}
 			return new VMCommand(CommandType.C_POP, MemorySegment.fromString(parts[1]), Integer.parseInt(parts[2]),
-					null, null);
+					null, null, null, null, null);
 			
 		case "label":
 			if (parts.length != 2) {
 				throw new IllegalArgumentException("Invalid label instruction: " + instruction);
 			}
 			return new VMCommand(CommandType.C_LABEL, null, null,
-					null, parts[1]);
+					null, parts[1], null, null, null);
 			
 		case "goto":
 			if (parts.length != 2) {
 				throw new IllegalArgumentException("Invalid goto instruction: " + instruction);
 			}
 			return new VMCommand(CommandType.C_GOTO, null, null,
-					null, parts[1]);
+					null, parts[1], null, null, null);
 			
 		case "if-goto":
 			if (parts.length != 2) {
 				throw new IllegalArgumentException("Invalid if-goto instruction: " + instruction);
 			}
 			return new VMCommand(CommandType.C_IF, null, null,
-					null, parts[1]);
+					null, parts[1], null, null, null);
 			
-		default: return new VMCommand(CommandType.C_ARITHMETIC, null, null, ArithmeticOperation.fromString(parts[0]), null);
+		case "call":
+			if (parts.length != 3) {
+				throw new IllegalArgumentException("Invalid call instruction: " + instruction);
+			}
+			return new VMCommand(CommandType.C_CALL, null, null,
+					null, null, parts[1], Integer.parseInt(parts[2]), null);
+			
+		case "function":
+			if (parts.length != 3) {
+				throw new IllegalArgumentException("Invalid function instruction: " + instruction);
+			}
+			return new VMCommand(CommandType.C_FUNCTION, null, null,
+					null, null, parts[1], null, Integer.parseInt(parts[2]));
+			
+		case "return":
+			if (parts.length != 1) {
+				throw new IllegalArgumentException("Invalid function instruction: " + instruction);
+			}
+			return new VMCommand(CommandType.C_RETURN, null, null,
+					null, null, null, null, null);
+			
+			
+		default: return new VMCommand(CommandType.C_ARITHMETIC, null, null, ArithmeticOperation.fromString(parts[0]), null, null, null, null);
 		}
 	}
 }

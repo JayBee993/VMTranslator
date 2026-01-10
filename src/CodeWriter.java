@@ -2,6 +2,8 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
 
 public class CodeWriter {
 
@@ -10,6 +12,10 @@ public class CodeWriter {
     int comparisonCounter = 0;
     
     boolean previousCommandledtoBoolean = false;
+    
+    // the following two fields are important for the returnAddrLabels
+    String currentfunctionName;
+    int returnLabelnumber;
 
     public CodeWriter(Path outputFile) throws IOException {
         this.writer = Files.newBufferedWriter(outputFile);
@@ -102,6 +108,7 @@ public class CodeWriter {
                     throw new IllegalArgumentException("Unexpected value: " + currentCommand);
             }
             break;
+            
         case C_LABEL:
         	writeLabel(currentCommand);
         	break;
@@ -110,6 +117,15 @@ public class CodeWriter {
         	break;
         case C_IF:
         	writeIfGoto(currentCommand);
+        	break;
+        case C_FUNCTION:
+        	writeFunction(currentCommand);
+        	break;
+        case C_CALL:
+        	writeCall(currentCommand);
+        	break;
+        case C_RETURN:
+        	writeReturn(currentCommand);
         	break;
 
         default:
@@ -127,12 +143,179 @@ public class CodeWriter {
         writer.newLine(); // platform-independent line break
     }
     
+    private void writeCall(VMCommand currentCommand) throws IOException {
+    	// put the current returnAddrLabel together    	
+    	String  retAddrLabel = currentfunctionName +"$ret." + String.valueOf(returnLabelnumber);
+    	
+    	// push retAddrLabel (return address label)
+    	writeLine("// call " + currentCommand.functionName());
+    	writeLine("// push retAddrLabel ");
+    	
+    	writeLine("@"+retAddrLabel);
+    	writeLine("D=A");
+    	writeLine("@SP");
+    	writeLine("A=M");
+    	writeLine("M=D");
+    	//SP ++
+    	writeLine("@SP");
+    	writeLine("M=M+1");
+    	
+    	// push LCL, ARG, THIS, THAT
+    	List<String> memorySegments = List.of("LCL","ARG","THIS","THAT");
+    	
+    	for(String segment : memorySegments ) {
+    		writeLine("// push " + segment);
+        	writeLine("@" + segment);
+        	writeLine("D=M");
+        	writeLine("@SP");
+        	writeLine("A=M");
+        	writeLine("M=D");
+        	//SP ++
+        	writeLine("@SP");
+        	writeLine("M=M+1");
+    	}
+    	
+    	// ARG=SP-5-nArgs
+    	writeLine("// ARG=SP-5-nArgs");
+    	writeLine("@SP");
+    	writeLine("D=M");
+    	writeLine("@5");
+    	writeLine("D=D-A");
+    	writeLine("@" + String.valueOf(currentCommand.numberOfArguments()));
+    	writeLine("D=D-A");
+    	writeLine("@ARG");
+    	writeLine("M=D");
+    	
+    	// LCL=SP
+    	writeLine("// LCL=SP");
+    	writeLine("@SP");
+    	writeLine("D=M");
+    	writeLine("@LCL");
+    	writeLine("M=D");
+    	
+    	// goto functionName of the callee (called function)
+    	writeLine("// goto " + currentCommand.functionName());
+    	writeLine("@" + currentCommand.functionName());
+    	writeLine("0;JMP");
+    	
+    	// (retAddrLabel) injects a label into the code
+    	writeLine("("+retAddrLabel+")");
+    	
+    	// increase the returnLabelnumber by 1
+    	returnLabelnumber += 1;
+    }
+    
+    private void writeFunction(VMCommand currentCommand) throws IOException {
+    	
+    	// set the current functionname of the caller
+    	currentfunctionName = currentCommand.functionName();
+    	// initialize the returnLabelbumber to 1
+    	returnLabelnumber = 1;
+    	
+    	writeLine("(" + currentfunctionName + ")");
+    	
+    	// push 0 nVars times
+    	writeLine("// push 0 nVars= "+ String.valueOf(currentCommand.numberOfLocalvariables()) +" times");
+    	writeLine("@0");
+    	writeLine("D=A");
+    	for(int i=0; i < currentCommand.numberOfLocalvariables(); i++) {
+        	// RAM[SP]=0
+        	writeLine("//RAM[SP]=0");
+        	pushDvaluetoStack();
+        	
+        	// SP++
+        	incrementStackPointer();		
+    	}
+    }
+    
+    private void writeReturn(VMCommand currentCommand) throws IOException {   	
+    	// return
+    	writeLine("// return");
+    	
+    	// endFrame = LCL
+    	writeLine("// endFrame = LCL");
+    	writeLine("@LCL");
+    	writeLine("D=M");
+    	writeLine("@R13"); // R13 = endFrame
+    	writeLine("M=D");
+    	
+    	// retAddr = *(endFrame-5)
+    	writeLine("// retAddr = *(endFrame-5)"); // in D there is still the address of LCL= endframe saved
+    	writeLine("@5");
+    	writeLine("A=D-A"); // A = endframe -5
+    	writeLine("D=M");   // D = *(endframe-5)
+    	writeLine("@R14"); // R14 = retAddr
+    	writeLine("M=D");
+    	
+    	// *ARG = pop()
+    	writeLine("// *ARG = pop()");
+    	writeLine("@SP"); //SP--
+    	writeLine("M=M-1");
+    	writeLine("A=M");
+    	writeLine("D=M");
+    	writeLine("@ARG");
+    	writeLine("A=M");
+    	writeLine("M=D");
+    	
+    	// SP=ARG+1
+    	writeLine("// SP=ARG+1");
+    	writeLine("@ARG");
+    	writeLine("D=M");
+    	writeLine("@SP");
+    	writeLine("M=D+1");
+    	
+    	// THAT=*(endFrame-1)
+    	writeLine("// THAT=*(endFrame-1)");
+    	writeLine("@R13"); // = endFrame
+    	writeLine("D=M"); // D = endframe
+    	writeLine("@1");
+    	writeLine("A=D-A"); // A = endframe -1
+    	writeLine("D=M");   // D = *(endframe-1), Wert an der Adresse
+    	writeLine("@THAT");
+    	writeLine("M=D");
+    	    	
+    	// THIS=*(endFrame-2)
+    	writeLine("// THIS=*(endFrame-2)");
+    	writeLine("@R13"); // = endFrame
+    	writeLine("D=M"); // D = endframe
+    	writeLine("@2");
+    	writeLine("A=D-A"); // A = endframe -2
+    	writeLine("D=M");   // D = *(endframe-2), Wert an der Adresse
+    	writeLine("@THIS");
+    	writeLine("M=D");
+    	
+    	// ARG =*(endFrame-3)
+    	writeLine("// ARG =*(endFrame-3)");
+    	writeLine("@R13"); // = endFrame
+    	writeLine("D=M"); // D = endframe
+    	writeLine("@3");
+    	writeLine("A=D-A"); // A = endframe -3
+    	writeLine("D=M");   // D = *(endframe-3), Wert an der Adresse
+    	writeLine("@ARG");
+    	writeLine("M=D");
+    	
+    	// LCL =*(endFrame-4)
+    	writeLine("// LCL =*(endFrame-4)");
+    	writeLine("@R13"); // = endFrame
+    	writeLine("D=M"); // D = endframe
+    	writeLine("@4");
+    	writeLine("A=D-A"); // A = endframe -4
+    	writeLine("D=M");   // D = *(endframe-4), Wert an der Adresse
+    	writeLine("@LCL");
+    	writeLine("M=D");
+    	
+		// goto retAddr
+    	writeLine("@R14"); // retAddr
+    	writeLine("A=M");  // make sure to jump to the address and not to RAM[4]
+    	writeLine("0;JMP");	
+    }
+    
     private void writeLabel(VMCommand currentCommand) throws IOException {
-    	writeLine("(" + currentCommand.label() + ")");
+    	writeLine("(" + currentfunctionName+"$"+currentCommand.label() + ")");
 	}
     
     private void writeGoto(VMCommand currentCommand) throws IOException {
-    	writeLine("@" + currentCommand.label());
+    	writeLine("@" + currentfunctionName+"$"+ currentCommand.label());
     	writeLine("0;JMP");
 	}
     
@@ -142,9 +325,9 @@ public class CodeWriter {
         	writeLine("@SP");
         	writeLine("M=M-1");
         	writeLine("A=M");
-        	writeLine("D=M+1"); // true = -1, if a evaluation is positiv the value -1 is written on top of the stack
+        	writeLine("D=M+1"); // true = -1, if a evaluation is positive the value -1 is written on top of the stack
         	
-        	writeLine("@" + currentCommand.label());
+        	writeLine("@" + currentfunctionName +"$"+ currentCommand.label());
         	writeLine("D;JEQ");
     	} else {
         	// case if we don't have an boolean value on the stack, in this case it is checked if the stackvalue is >0
@@ -153,7 +336,7 @@ public class CodeWriter {
         	writeLine("A=M");
         	writeLine("D=M");
         	
-        	writeLine("@" + currentCommand.label());
+        	writeLine("@" + currentfunctionName+"$"+ currentCommand.label());
         	writeLine("D;JGT");
     	}
     	
