@@ -2,6 +2,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -21,6 +22,19 @@ public class CodeWriter {
         this.writer = Files.newBufferedWriter(outputFile);
     }
     
+    public void writeInitialize() throws IOException {
+    	// SP = 261
+    	writeLine("// SP = 261");
+    	writeLine("@261");
+    	writeLine("D=A");
+    	writeLine("@SP");
+    	writeLine("M=D");
+    	
+
+    	// goto Sys.init
+    	writeLine("@Sys.init");
+    	writeLine("0;JMP");  	
+    }
     
     public void write(VMCommand currentCommand) throws IOException {
     	
@@ -161,7 +175,8 @@ public class CodeWriter {
     	writeLine("M=M+1");
     	
     	// push LCL, ARG, THIS, THAT
-    	List<String> memorySegments = List.of("LCL","ARG","THIS","THAT");
+//    	List<String> memorySegments = List.of("LCL","ARG","THIS","THAT");
+    	List<String> memorySegments = Arrays.asList("LCL","ARG","THIS","THAT");
     	
     	for(String segment : memorySegments ) {
     		writeLine("// push " + segment);
@@ -372,7 +387,7 @@ public class CodeWriter {
     	writeLine("D=A");
     	writeLine("@" + memorySegment);
     	writeLine("D=D+M");
-    	writeLine("@addr"); // save the address temporarily
+    	writeLine("@R15"); //@addr save the address temporarily
     	writeLine("M=D");
     	
     	if(currentCommand.commandType().equals(CommandType.C_POP)) {
@@ -382,7 +397,7 @@ public class CodeWriter {
         	// RAM[addr] <- RAM[SP]
         	writeLine("// RAM[addr] <- RAM[SP]");
         	popStackValueandSavetoD();
-        	writeLine("@addr");
+        	writeLine("@R15"); //@addr
         	writeLine("A=M");
         	writeLine("M=D");
     	}
@@ -391,7 +406,7 @@ public class CodeWriter {
   	
         	// RAM[SP] <- RAM[addr]
         	writeLine("// RAM[SP] <- RAM[addr]");
-        	writeLine("@addr");
+        	writeLine("@R15"); //@addr
         	writeLine("A=M");
         	writeLine("D=M");
         	pushDvaluetoStack();
@@ -406,7 +421,7 @@ public class CodeWriter {
     	String location = String.valueOf(currentCommand.location());
     	// RAM[SP] <- Foo.i
     	writeLine("// RAM[SP] <- Foo." + location);
-    	writeLine("@Foo." + location);
+    	writeLine("@"+currentfunctionName.split("\\.")[0]+"$Foo." + location);
     	writeLine("D=M");
     	pushDvaluetoStack();
     	
@@ -424,7 +439,7 @@ public class CodeWriter {
     	// Foo.i <- RAM[SP] 
     	writeLine("// Foo." + location + "<- RAM[SP]");
     	popStackValueandSavetoD();    	
-    	writeLine("@Foo." + location);
+    	writeLine("@"+currentfunctionName.split("\\.")[0] + "$Foo." + location);
     	writeLine("M=D");    	
     }
     
@@ -457,14 +472,14 @@ public class CodeWriter {
     	writeLine("D=A");
     	writeLine("@5");
     	writeLine("D=D+A");
-    	writeLine("@addr");
+    	writeLine("@R15"); //@addr
     	writeLine("M=D");
     	
     	//SP --
 //    	decrementStackPointer();
     	popStackValueandSavetoD(); 
     	
-    	writeLine("@addr");
+    	writeLine("@R15"); //@addr
     	writeLine("A=M");
     	writeLine("M=D");    	
     }
